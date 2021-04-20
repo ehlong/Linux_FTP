@@ -4,6 +4,8 @@
 #include "mftp.h"
 #include "client.h"
 
+//TODO: Work on forks, test client
+
 static char *serveAddr = NULL;
 
 int clientSocket(int portNum, char *address) {
@@ -35,91 +37,126 @@ int clientSocket(int portNum, char *address) {
 }
 
 char *getCommand() {
-    char c;
-    char *input = malloc(4096 + 5);
-    memset(input, '\0', 4096 + 5);
-    int control = 0;
-    while ((c = getchar()) != EOF) {
-        if (isspace(c) && control == 0) {
-            continue;
-        }
-        else if (isspace(c) && control == 1) {
-            strncat(input, " ", 1);
-            control = 2;
-            continue;
-        }
-        else if (isspace(c) && control == 3) {
-            break;
-        }
-        else {
-            strncat(input, &c, 1);
-            if (control == 0) {
-                control = 1;
-            }
-            if (control == 2) {
-                control = 3;
-            }
-        }
+    char c, *command, *first, *second;
+    char *input = NULL;    //holds input
+    size_t length = 0;
+//    int control = 0;                          //initialize control
+    char *tokens = " \f\n\r\t\v";               //all whitespace for strtok
+    getline(&input, &length, stdin);            //get input
+    first = strtok(input, tokens);              //tokenize
+    command = malloc(strlen(first));            //init command
+    memset(command, '\n', strlen(command));     //set memory to nl
+    strncpy(command, first, strlen(first) - 1); //copy first into command
+    second = strtok(NULL, tokens);          //try and get second
+    if (second != NULL) {                       //if it exists
+        strncat(command, " ", 1);               //change last char to space
+        realloc(command, strlen(command) + strlen(second));
+        strncat(command, second, strlen(second) - 1);
+        strncat(command, "\n", 1);              //realloc, cat 2nd, cat \n
     }
-    return input;
+    //   while ((c = getchar()) != EOF) {
+    //    if (isspace(c) && control == 0) {
+    //        continue;
+    //    }
+    //    else if (isspace(c) && control == 1) {
+    //        strncat(input, " ", 1);
+    //        control = 2;
+    //        continue;
+    //    }
+    //    else if (isspace(c) && control == 3) {
+    //        break;
+    //    }
+    //    else {
+    //        strncat(input, &c, 1);
+    //        if (control == 0) {
+    //            control = 1;
+    //        }
+    //        if (control == 2) {
+    //            control = 3;
+    //        }
+    //    }
+    //}
+    free(input);
+    return command;
 }
 
 int clientProcess(const char *input, int socketFD, int dataFD) {
-    char *first, *second;
-    int d_fd = dataFD;
-    switch (input[0]) {
+    char *first, *second;           //holds args
+    int d_fd = dataFD;              //grab dataFD
+    switch (input[0]) {             //check input
         case 'e':
             if (!strcmp(input, "exit")) {
                 toServer("Q", " ", socketFD, 0);
-                return -1;
+                return -1;          //exit, tell client
             }
             else {
-                //error
+                printf("Invalid input\n");
             }
             break;
         case 'c':
             first = strtok(input, " ");
             if (!strcmp(first, "cd")) {
                 second = strtok(NULL, " ");
-                toServer("C", second, socketFD, d_fd);
+                //fork cd
+            }
+            else {
+                printf("Invalid input\n");
             }
             break;
         case 'l':
             first = strtok(input, " ");
             if (!strcmp(first, "ls")) {
-                toServer("L", " ", socketFD, d_fd);
+                //fork ls-l
+            }
+            else {
+                printf("Invalid input\n");
             }
             break;
         case 'g':
             first = strtok(input, " ");
             if (!strcmp(first, "get")) {
                 second = strtok(NULL, " ");
-                toServer("G", second, socketFD, dataFD);
+                d_fd = toServer("G", second, socketFD, dataFD);
+                //make file
+                //set to 700
+                //write to file
+            }
+            else {
+                printf("Invalid input\n");
             }
             break;
         case 's':
             first = strtok(input, " ");
             if (!strcmp(first, "show")) {
                 second = strtok(NULL, " ");
-                toServer("S", second, socketFD, dataFD);
+                d_fd = toServer("G", second, socketFD, dataFD);
+                //write to stdout
+            }
+            else {
+                printf("Invalid input\n");
             }
             break;
         case 'p':
             first = strtok(input, " ");
             if (!strcmp(first, "put")) {
                 second = strtok(NULL, " ");
-                toServer("P", second, socketFD, dataFD);
+                d_fd = toServer("P", second, socketFD, dataFD);
             }
             break;
         case 'r':
             if (!strcmp(input, "rls")) {
-                toServer("rls", second, socketFD, dataFD);
+                d_fd = toServer("L", second, socketFD, dataFD);
+                //print server ls -l to client
             }
             else {
                 first = strtok(input, " ");
                 if (!strcmp(first, "rcd")) {
                     second = strtok(NULL, " ");
-                    toServer("rcd", second, socketFD, dataFD);
+                    toServer("C", second, socketFD, dataFD);
+                    //cd on the server
+                }
+                else {
+                    printf("Invalid input\n");
                 }
             }
             break;
@@ -131,17 +168,11 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
 }
 
 int toServer(char *command, char *address, int socketFD, int dataFD) {
-    char buff[1];
-    char *d_port;
     int d_fd = dataFD;
     switch (command[0]) {
         case 'C':
-            serveTalk(command, address, socketFD);
-            break;
-        case 'L':
-            if (d_fd == 0) {
-                d_fd = dataPort(socketFD);
-            }
+            write(socketFD, command, 1);
+            write(socketFD, "\n", 1);
             break;
         case 'G':
             if (d_fd == 0) {
@@ -158,10 +189,14 @@ int toServer(char *command, char *address, int socketFD, int dataFD) {
         case 'Q':
             free(serveAddr);
             write(socketFD, command, 1);
+            write(socketFD, "\n", 1);
             break;
-        case 'S':
-            break;
-        case 'r':
+        case 'L':
+            if (d_fd == 0) {
+                d_fd = dataPort(socketFD);
+            }
+            write(socketFD, command, 1);
+            write(socketFD, "\n", 1);
             break;
         default:
             printf("Error Processing");
@@ -180,7 +215,7 @@ int dataPort(int socketFD) {
         read(socketFD, buff, 1);
         strncat(dataPort, buff, 1);
         while (buff[0] != '\n') {
-            realloc(dataPort, sizeof(*dataPort) + 1);
+            realloc(dataPort, strlen(dataPort) + 1);
             strncat(dataPort, buff, 1);
         }
         strncat(dataPort, "\0", 1);
@@ -193,6 +228,6 @@ int dataPort(int socketFD) {
 
 void serveTalk(char *command, char *address, int socketFD) {
     write(socketFD, command, 1);
-    write(socketFD, address, sizeof(*address));
+    write(socketFD, address, strlen(address));
     write(socketFD, "\n", 1);
 }
