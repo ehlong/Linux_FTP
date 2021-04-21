@@ -4,7 +4,7 @@
 #include "mftp.h"
 #include "client.h"
 
-//TODO: Work on forks, test client
+//TODO: test client
 
 static char *serveAddr = NULL;
 
@@ -81,7 +81,7 @@ char *getCommand() {
 }
 
 int clientProcess(const char *input, int socketFD, int dataFD) {
-    char *first, *second;           //holds args
+    char *first, *second, **local;  //holds args
     int d_fd = dataFD;              //grab dataFD
     switch (input[0]) {             //check input
         case 'e':
@@ -94,10 +94,18 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             }
             break;
         case 'c':
-            first = strtok(input, " ");
-            if (!strcmp(first, "cd")) {
+            first = strtok(input, " "); //get first arg
+            if (!strcmp(first, "cd")) {     //if cd
+                local = malloc(sizeof(char*) * 2);
+                local[0] = malloc(strlen(first));
+                strcpy(local[0], first);
                 second = strtok(NULL, " ");
-                //fork cd
+                local[1] = malloc(strlen(second));
+                strcpy(local[1], second);   //malloc, load local with args
+                forker(local);
+                free(local[0]);
+                free(local[1]);
+                free(local);
             }
             else {
                 printf("Invalid input\n");
@@ -106,7 +114,15 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
         case 'l':
             first = strtok(input, " ");
             if (!strcmp(first, "ls")) {
-                //fork ls-l
+                local = malloc(sizeof(char*) * 2);
+                local[0] = malloc(strlen(first));
+                strcpy(local[0], first);
+                local[1] = malloc(3);
+                strcpy(local[1], "-l");
+                forker(local);
+                free(local[0]);
+                free(local[1]);
+                free(local);
             }
             else {
                 printf("Invalid input\n");
@@ -117,6 +133,12 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             if (!strcmp(first, "get")) {
                 second = strtok(NULL, " ");
                 d_fd = toServer("G", second, socketFD, dataFD);
+                char *name = fdReader(d_fd);
+                char *filename = strrchr(name, '/');
+                filename++;
+                FILE *file = fopen(filename, "w");
+                chmod(filename, S_IRWXU);
+                fileWrite(d_fd, file);
                 //make file
                 //set to 700
                 //write to file
@@ -130,7 +152,7 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             if (!strcmp(first, "show")) {
                 second = strtok(NULL, " ");
                 d_fd = toServer("G", second, socketFD, dataFD);
-                //write to stdout
+                fdProc(d_fd, 1);            //write from d_fd to stdout
             }
             else {
                 printf("Invalid input\n");
@@ -146,7 +168,7 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
         case 'r':
             if (!strcmp(input, "rls")) {
                 d_fd = toServer("L", second, socketFD, dataFD);
-                //print server ls -l to client
+                fdProc(d_fd, 1);        //write from d_fd to stdout
             }
             else {
                 first = strtok(input, " ");
@@ -230,4 +252,20 @@ void serveTalk(char *command, char *address, int socketFD) {
     write(socketFD, command, 1);
     write(socketFD, address, strlen(address));
     write(socketFD, "\n", 1);
+}
+
+void forker(char **args) {
+    int c_id;       //holds child id
+    c_id = fork();
+    if (c_id < 0) { //fork error
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+        exit(-errno);
+    }
+    else if (c_id) {    //parent
+        wait(&c_id);
+    }
+    else {              //child
+        execvp(args[0], args);
+        fprintf(stderr, "Error: %s\n", strerror(errno)); //if error
+    }
 }
