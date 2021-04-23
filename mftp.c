@@ -13,15 +13,16 @@ int main(int argc, char **argv) {
         while (1){          //infinite loop
             char *input;    //holds command
             printf("Enter one of the following commands:\n");
-            printf("exit\ncd <pathname>\nrcd <pathname>\n ls\n"
+            printf("exit\ncd <pathname>\nrcd <pathname>\nls\n"
                    "rls\nget <pathname>\nshow <pathname>\n"
-                   "put <pathname>\n");
+                   "put <pathname>\nMFTP>");
             input = getCommand();   //process input
             d_fd = clientProcess(input, s_fd, d_fd);    //process command,
             free(input);        //free input              get dataFD
             if (d_fd == -1) {   //if quit
                 break;          //exit
             }
+            d_fd = 0;
         }
     }
     return 0;
