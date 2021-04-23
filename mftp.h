@@ -14,7 +14,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#define PORT_NUM 49999
+#define PORT_NUM 48888
 #ifndef INC_360FINAL_MFTP_H
 #define INC_360FINAL_MFTP_H
 

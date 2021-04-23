@@ -37,7 +37,7 @@ int clientSocket(int portNum, char *address) {
 }
 
 char *getCommand() {
-    char c, *command, *first, *second;
+    char *command, *first, *second;
     char *input = NULL;    //holds input
     size_t length = 0;
     char *tokens = " \f\n\r\t\v";               //all whitespace for strtok
@@ -54,7 +54,7 @@ char *getCommand() {
         strncat(command, "\0", 1);              //realloc, cat 2nd, cat \n
     }
     free(input);
-    printf(command);
+    printf("\n");
     return command;
 }
 
@@ -75,7 +75,9 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             first = strtok(input, " "); //get first arg
             if (!strcmp(first, "cd")) {     //if cd
                 second = strtok(NULL, " ");
-                chdir(second);
+                if (chdir(second) == -1) {
+                    fprintf(stderr, "CD Error: %s\n", strerror(errno)); //if error
+                }
             }
             else {
                 printf("Invalid input\n");
@@ -104,11 +106,24 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             if (!strcmp(first, "get")) {
                 second = strtok(NULL, " ");
                 d_fd = toServer("G", second, socketFD, dataFD);
-                char *name = fdReader(d_fd);
+                read(socketFD, buff, 1);
+                if (buff[0] == 'A') {
+                    printf("get worked\n");
+                    read(socketFD, buff, 1);
+                }
+                char *name = second;
+                printf("Name:%s\n", name);
                 char *filename = strrchr(name, '/');
-                filename++;
+                if (filename == NULL) {
+                    filename = name;
+                }
+                else {
+                    filename++;
+                }
+                printf("FN:%s", filename);
                 int file = open(filename, O_WRONLY | O_CREAT, S_IRWXU);
                 fdProc(d_fd, file);
+                close(d_fd);
                 //make file
                 //set to 700
                 //write to file
@@ -117,12 +132,18 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
                 printf("Invalid input\n");
             }
             break;
-        case 's':
+        case 's':                       //works
             first = strtok(input, " ");
             if (!strcmp(first, "show")) {
                 second = strtok(NULL, " ");
                 d_fd = toServer("G", second, socketFD, dataFD);
+                read(socketFD, buff, 1);
+                if (buff[0] == 'A') {
+                    printf("show worked\n");
+                    read(socketFD, buff, 1);
+                }
                 more(d_fd);            //write from d_fd to stdout
+                close(d_fd);
             }
             else {
                 printf("Invalid input\n");
@@ -133,13 +154,32 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             if (!strcmp(first, "put")) {
                 second = strtok(NULL, " ");
                 d_fd = toServer("P", second, socketFD, dataFD);
+                read(socketFD, buff, 1);
+                if (buff[0] == 'A') {
+                    printf("put worked\n");
+                    read(socketFD, buff, 1);
+                }
+                char *name = second;
+                printf("Name:%s\n", name);
+                char *filename = strrchr(name, '/');
+                if (filename == NULL) {
+                    filename = name;
+                }
+                else {
+                    filename++;
+                }
+                printf("FN:%s", filename);
+                int file = open(filename, O_RDONLY);
+                fdProc(file, d_fd);
+                close(d_fd);
             }
             break;
         case 'r':
-            if (!strcmp(input, "rls")) {
+            if (!strcmp(input, "rls")) {        //works
                 d_fd = toServer("L", second, socketFD, dataFD);
                 read(socketFD, buff, 1);
                 if (buff[0] == 'A') {
+                    printf("Going to more\n");
                     read(socketFD, buff, 1);
                     more(d_fd);        //write from d_fd to stdout
                 }
@@ -151,6 +191,10 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
                     second = strtok(NULL, " ");
                     toServer("C", second, socketFD, dataFD);
                     read(socketFD, buff, 1);
+                    if (buff[0] == 'A') {
+                        printf("rcd worked\n");
+                        read(socketFD, buff, 1);
+                    }
                     //cd on the server
                 }
                 else {
@@ -165,11 +209,13 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
     return d_fd;
 }
 
+
 int toServer(char *command, char *address, int socketFD, int dataFD) {
     int d_fd = dataFD;
     switch (command[0]) {
         case 'C':
             write(socketFD, command, 1);
+            write(socketFD, address, strlen(address));
             write(socketFD, "\n", 1);
             break;
         case 'G':
@@ -193,6 +239,9 @@ int toServer(char *command, char *address, int socketFD, int dataFD) {
             if (d_fd == 0) {
                 d_fd = dataPort(socketFD);
                 printf("Got dataport\n");
+            }
+            else {
+                printf("Why no dataport?\n");
             }
             write(socketFD, command, 1);
             write(socketFD, "\n", 1);

@@ -12,7 +12,7 @@ void fdProc(int read_fd, int write_fd) {
         }
         check = write(write_fd, buff, 1);
         if (check == -1) {
-            printf("Error: Write error\n");
+//            printf("Error: Write error\n");
         }
     }
 }
