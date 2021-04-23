@@ -50,7 +50,7 @@ char *getCommand() {
     if (second != NULL) {                       //if it exists
         strncat(command, " ", 1);               //change last char to space
         realloc(command, strlen(command) + strlen(second));
-        strncat(command, second, strlen(second) - 1);
+        strncat(command, second, strlen(second));
         strncat(command, "\0", 1);              //realloc, cat 2nd, cat \n
     }
     free(input);
@@ -74,16 +74,8 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
         case 'c':
             first = strtok(input, " "); //get first arg
             if (!strcmp(first, "cd")) {     //if cd
-                local = malloc(sizeof(char*) * 2);
-                local[0] = malloc(strlen(first));
-                strcpy(local[0], first);
                 second = strtok(NULL, " ");
-                local[1] = malloc(strlen(second));
-                strcpy(local[1], second);   //malloc, load local with args
-                forker(local);
-                free(local[0]);
-                free(local[1]);
-                free(local);
+                chdir(second);
             }
             else {
                 printf("Invalid input\n");
@@ -151,12 +143,14 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
                     read(socketFD, buff, 1);
                     more(d_fd);        //write from d_fd to stdout
                 }
+                close(d_fd);
             }
             else {
                 first = strtok(input, " ");
                 if (!strcmp(first, "rcd")) {
                     second = strtok(NULL, " ");
                     toServer("C", second, socketFD, dataFD);
+                    read(socketFD, buff, 1);
                     //cd on the server
                 }
                 else {
@@ -251,7 +245,8 @@ void forker(char **args) {
         wait(&c_id);
     }
     else {              //child
-        execvp(args[0], args);
+        printf("command:%s\nlocation:%s\n", args[0], args[1]);
+        execlp(args[0], args[0], args[1], args[2]);
         fprintf(stderr, "EXECVP Error: %s\n", strerror(errno)); //if error
     }
 }
