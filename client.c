@@ -59,7 +59,7 @@ char *getCommand() {
 }
 
 int clientProcess(const char *input, int socketFD, int dataFD) {
-    char *first, *second, **local;  //holds args
+    char buff[1], *first, *second, **local;  //holds args
     int d_fd = dataFD;              //grab dataFD
     switch (input[0]) {             //check input
         case 'e':
@@ -146,7 +146,11 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
         case 'r':
             if (!strcmp(input, "rls")) {
                 d_fd = toServer("L", second, socketFD, dataFD);
-                more(d_fd);        //write from d_fd to stdout
+                read(socketFD, buff, 1);
+                if (buff[0] == 'A') {
+                    read(socketFD, buff, 1);
+                    more(d_fd);        //write from d_fd to stdout
+                }
             }
             else {
                 first = strtok(input, " ");
@@ -213,9 +217,16 @@ int dataPort(int socketFD) {
     read(socketFD, buff, 1);
     if (buff[0] == 'A') {
         printf("Got to acknowledge\n");
-        read(socketFD, dataPort, 5);
+        int i = 0;
+        read(socketFD, buff, 1);
+        while (buff[0] != '\n') {
+            printf("Buff not nl\n");
+            write(1, buff, 1);
+            dataPort[i] = buff[0];
+            i++;
+            read(socketFD, buff, 1);
+        }
         dataPort[5] = '\0';
-        read(socketFD, dataPort, 1);
         printf("%s\n", dataPort);
         d_fd = atoi(dataPort);
         d_fd = clientSocket(d_fd, serveAddr);
