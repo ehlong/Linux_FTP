@@ -136,9 +136,8 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
                 char *name = fdReader(d_fd);
                 char *filename = strrchr(name, '/');
                 filename++;
-                FILE *file = fopen(filename, "w");
-                chmod(filename, S_IRWXU);
-                fileWrite(d_fd, file);
+                int file = open(filename, O_WRONLY | O_CREAT, S_IRWXU);
+                fdProc(d_fd, file);
                 //make file
                 //set to 700
                 //write to file
@@ -152,7 +151,7 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
             if (!strcmp(first, "show")) {
                 second = strtok(NULL, " ");
                 d_fd = toServer("G", second, socketFD, dataFD);
-                fdProc(d_fd, 1);            //write from d_fd to stdout
+                more(d_fd);            //write from d_fd to stdout
             }
             else {
                 printf("Invalid input\n");
@@ -168,7 +167,7 @@ int clientProcess(const char *input, int socketFD, int dataFD) {
         case 'r':
             if (!strcmp(input, "rls")) {
                 d_fd = toServer("L", second, socketFD, dataFD);
-                fdProc(d_fd, 1);        //write from d_fd to stdout
+                more(d_fd);        //write from d_fd to stdout
             }
             else {
                 first = strtok(input, " ");
@@ -266,6 +265,24 @@ void forker(char **args) {
     }
     else {              //child
         execvp(args[0], args);
+        fprintf(stderr, "Error: %s\n", strerror(errno)); //if error
+    }
+}
+
+void more(int d_fd) {
+    int test;
+    test = fork();
+    if (test < 0) {             //error
+        fprintf(stderr, "Error: %s", strerror(errno));
+        exit(1);
+    }
+    else if (test > 0) {	                //parent
+        wait(NULL);
+        //acknowledge?
+    }
+    else {                          //child
+        dup2(d_fd, 0);
+        execlp("more", "more", "-20", NULL);
         fprintf(stderr, "Error: %s\n", strerror(errno)); //if error
     }
 }

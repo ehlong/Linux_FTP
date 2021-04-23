@@ -3,13 +3,12 @@
 
 int main(int argc, char **argv) {
     if (argc != 2) {        //if too many args
-            //error handle
+            printf("Error: Too many arguments. Exiting. \n");
+            return 1;
     }
     else {
         int s_fd, d_fd;     //socket FDs
         s_fd = clientSocket(PORT_NUM, argv[1]); //get control socket
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
         d_fd = 0;           //default dataFD to 0
         while (1){          //infinite loop
             char *input;    //holds command
@@ -24,7 +23,6 @@ int main(int argc, char **argv) {
                 break;          //exit
             }
         }
-#pragma clang diagnostic pop
     }
     return 0;
 }

@@ -12,5 +12,6 @@ int toServer(char *command, char *address, int connect, int dataFD);
 int dataPort(int socketFD);
 void serveTalk(char *command, char *address, int socketFD);
 void forker(char **args);
+void more(int d_fd);
 
 #endif //INC_360FINAL_CLIENT_H

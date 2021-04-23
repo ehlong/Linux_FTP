@@ -5,14 +5,14 @@ void fdProc(int read_fd, int write_fd) {
     int check = 0;
     while ((check = read(read_fd, buff, 1))) {
         if (check == -1) {
-            //r error
+            printf("Error: Read error\n");
         }
         if (buff[0] == EOF) {
             break;
         }
         check = write(write_fd, buff, 1);
         if (check == -1) {
-            //w error
+            printf("Error: Write error\n");
         }
     }
 }
@@ -48,24 +48,10 @@ char *fdReader(int read_fd) {
     return readVal;
 }
 
-void fileWrite(int read_fd, FILE *file) {
-    char buff[1];
-    int check = 0;
-    while ((check = read(read_fd, buff, 1))) {
-        if (check == -1) {
-            //r error
-        }
-        if (buff[0] == EOF) {
-            break;
-        }
-        check = fputc(buff[0], file);
-        if (check < 0) {
-            //w error
-        }
+void fdWriter(char *message, int write_fd) {
+    int check;
+    check = write(write_fd, message, strlen(message));
+    if (check == -1) {
+        printf("Error: Write failed\n");
     }
-    fclose(file);
-}
-
-void fdWriter(int write_fd) {
-
 }
