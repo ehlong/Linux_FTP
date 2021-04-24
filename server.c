@@ -1,14 +1,10 @@
-//
-// Created by Elliott Long on 4/21/21.
-//
-
 #include "server.h"
 #include "mftp.h"
 
 int serverSocket(int port, int maxCon) {
     int portUsed;
     if (port == -1) {
-        portUsed = PORT_NUM;
+        portUsed = PORT_NUM;        //changeable in mftp.h
     }
     else {
         portUsed = port;
@@ -42,7 +38,7 @@ int serverSocket(int port, int maxCon) {
         perror("Error");
         exit(1);
     }                                       //mark socket as "listen" socket
-    return l_fd;
+    return l_fd;                            //standard FTP socket function
 }
 
 void serveLoop(int l_fd) {
@@ -54,7 +50,7 @@ void serveLoop(int l_fd) {
     while(1) {
         c_fd = accept(l_fd, (struct sockaddr*) &clientAddress,
                       &length);
-        if (c_fd < 0) {                 //actually listen on port
+        if (c_fd < 0) {                 //accept connection
             perror("Error");
             exit(1);
         }
@@ -64,8 +60,7 @@ void serveLoop(int l_fd) {
             sizeof(clientName), NULL, 0,
             NI_NUMERICSERV);
         if (hostEntry != 0) {   //get client name
-            fprintf(stderr,
-                    "Error: %s\n", gai_strerror(hostEntry));
+            fprintf(stderr, "Error: %s\n", gai_strerror(hostEntry));
             exit(1);
         }
         pid = fork();                   //fork
@@ -76,23 +71,20 @@ void serveLoop(int l_fd) {
         else if (pid > 0) {	                //parent
             printf("Successful Connection of %s\n", clientName);
             fflush(stdout);         //print client
-            close(c_fd);
+            close(c_fd);            //reuse fd
             while(waitpid(0, NULL, WNOHANG) > 0);   //clean up zombies
         }
-        else {                          //child     *****ABOVE WORKS*****
+        else {                          //child
             while(1) {
-                instructions = fdReader(c_fd);      //check this
-                printf("Instructions received\n");
+                instructions = fdReader(c_fd);
                 write(1, instructions, strlen(instructions));
                 flag = serverProcess(instructions, c_fd, 0);
-                if (flag > 0) {
-                    printf("Pre-free\n");
+                if (flag > 0) {     //if dataport needed
                     free(instructions);
-                    printf("First free\n");
                     instructions = fdReader(c_fd);
-                    flag = serverProcess(instructions, c_fd, flag);
+                    serverProcess(instructions, c_fd, flag);
                 }
-                else if (flag < 0) {
+                else if (flag < 0) {    //if exiting
                     free(instructions);
                     exit(1);
                 }
@@ -103,14 +95,14 @@ void serveLoop(int l_fd) {
 }
 
 int serverProcess(char *input, int c_fd, int data_fd) {
-    printf("At process\n");
-    write(1, input, 1);
     int d_fd = data_fd;
     switch (input[0]) {             //check input
         case 'Q':
+            //quit
             d_fd = quit(c_fd);
             break;
         case 'D':
+            //dfd
             d_fd = dataFD(c_fd);
             break;
         case 'C':
@@ -146,25 +138,20 @@ int serverProcess(char *input, int c_fd, int data_fd) {
     return d_fd;
 }
 
-void ls(int d_fd) {
-    printf("At LS\n");
+void ls(int c_fd, int d_fd) {
     int test;
-    if (test != 0) {		//if pipe fails
-        printf("%s\n", strerror(errno));
-    }
     test = fork();
     if (test < 0) {             //error
-        fprintf(stderr, "Error: %s", strerror(errno));
+        errorFormat(c_fd);
         exit(1);
     }
     else if (test > 0) {	                //parent
         wait(NULL);
-        //acknowledge?
     }
     else {                          //child
         dup2(d_fd, 1);
         execlp("ls", "ls", "-l", "-a", NULL);
-        fprintf(stderr, "Error: %s\n", strerror(errno)); //if error
+        errorFormat(c_fd);
     }
 }
 
@@ -172,12 +159,17 @@ int quit(int c_fd) {
     fdWriter("A\n", c_fd);          //acknowledge
     return -1;                              //quit value
 }
-int cd(int c_fd, char *input) {
+
+void cd(int c_fd, char *input) {
     char *first;
     int test;
     first = malloc(strlen(input) - 1);
     memset(first, '\0', strlen(first));
     memcpy(first, &input[1], strlen(input) - 1);
+    test = access(first, X_OK);
+    if (test == -1) {
+        errorFormat(c_fd);
+    }
     test = chdir(first);
     if (test == -1) {
         errorFormat(c_fd);
@@ -187,33 +179,29 @@ int cd(int c_fd, char *input) {
     }
 }
 
-int lsl(int c_fd, int d_fd) {                   //works
+void lsl(int c_fd, int d_fd) {
     if (d_fd <= 0) {
         fdWriter("EError: Data connection not established\n", c_fd);
     }
     else {
         int in = dup(0);
         int out = dup(1);
-        ls(d_fd);
+        ls(c_fd, d_fd);
         dup2(in, 0);
         dup2(out, 1);
     }
 }
 
-int get(int c_fd, int d_fd, char *input) {          //works
+void get(int c_fd, int d_fd, char *input) {
     if (d_fd <= 0) {
         fdWriter("EError: Data connection not established\n", c_fd);
     }
     else {
-        printf("\n\n");
-        write(1, input, strlen(input));
-        printf("\n\n");
         char *first;
         int test;
         first = malloc(strlen(input) - 1);
         memset(first, '\0', strlen(first));
         memcpy(first, &input[1], strlen(input) - 1);
-        printf(first);
         test = access(first, R_OK | F_OK);
         if (test == -1) {
             errorFormat(c_fd);
@@ -227,18 +215,16 @@ int get(int c_fd, int d_fd, char *input) {          //works
     }
 }
 
-int put(int c_fd, int d_fd, char *input) {
+void put(int c_fd, int d_fd, char *input) {
     if (d_fd <= 0) {
         fdWriter("EError: Data connection not established\n", c_fd);
     }
     else {
-        printf("At put\n");
         char *first;
         int test;
         first = malloc(strlen(input) - 1);
         memset(first, '\0', strlen(first));
         memcpy(first, &input[1], strlen(input) - 1);
-        printf(first);
         char *last = strrchr(first, '/');
         if (last != NULL) {
             //use last for put
@@ -265,18 +251,14 @@ int put(int c_fd, int d_fd, char *input) {
     }
 }
 
-int dataFD(int c_fd) {                      //works
-    printf("At DFD\n");
+int dataFD(int c_fd) {
     int d_fd, size;
     d_fd = serverSocket(0, 1);  //make data connection
-    printf("DFD made\n");
     int sock = getSock(d_fd);
     size = snprintf( NULL, 0, "%d", sock );
-    printf("Size: %i DFS: %i\n", size, sock);
     char *port = malloc(size + 3);
     memset(port, '\n', size + 3);
     snprintf(port, size + 3, "A%d\n", sock);  //write fd to port
-    printf(port);
     fdWriter(port, c_fd);                   //send to client
     free(port);
     int length;
@@ -285,7 +267,7 @@ int dataFD(int c_fd) {                      //works
     d_fd = accept(d_fd, (struct sockaddr*) &clientAddress,
                   &length);
     if (d_fd < 0) {                 //actually listen on port
-        perror("Error");
+        errorFormat(c_fd);
         exit(1);
     }
     return d_fd;

@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
                    "rls\nget <pathname>\nshow <pathname>\n"
                    "put <pathname>\nMFTP>");
             input = getCommand();   //process input
-            d_fd = clientProcess(input, s_fd, d_fd);    //process command,
+            d_fd = clientProcess(input, s_fd, d_fd, argv[1]);    //process command,
             free(input);        //free input              get dataFD
             if (d_fd == -1) {   //if quit
                 break;          //exit
