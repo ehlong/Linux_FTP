@@ -134,8 +134,8 @@ int serverProcess(char *input, int c_fd, int data_fd) {
         case 'P':
             //dfd
             //put file
-            put(c_fd, d_fd, input);
             write(c_fd, "A\n", 2);
+            put(c_fd, d_fd, input);
             close(d_fd);
             break;
         default:
@@ -197,7 +197,6 @@ int lsl(int c_fd, int d_fd) {                   //works
         ls(d_fd);
         dup2(in, 0);
         dup2(out, 1);
-        fdWriter("A\n", c_fd);
     }
 }
 
@@ -256,7 +255,6 @@ int put(int c_fd, int d_fd, char *input) {
             //use first for put
             test = access(first, F_OK);
             if (test == -1) {               //file does NOT exist
-                first++;
                 int file = open(first, O_WRONLY | O_CREAT, S_IRWXU);
                 fdProc(d_fd, file);
                 close(file);
@@ -278,6 +276,7 @@ int dataFD(int c_fd) {                      //works
     char *port = malloc(size + 3);
     memset(port, '\n', size + 3);
     snprintf(port, size + 3, "A%d\n", sock);  //write fd to port
+    printf(port);
     fdWriter(port, c_fd);                   //send to client
     free(port);
     int length;
