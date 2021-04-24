@@ -18,7 +18,6 @@ void fdProc(int read_fd, int write_fd) {
 }
 
 char *fdReader(int read_fd) {
-    write(1, "here\n", 5);
     char *readVal = malloc(1);
     memset(readVal, '\n', 1);
     char buff[1];
@@ -26,6 +25,10 @@ char *fdReader(int read_fd) {
     check = read(read_fd, buff, 1);
     if (check == -1) {
         fprintf(stderr, "Error: %s\n", strerror(errno));
+    }
+    if (check == 0) {
+        free(readVal);
+        return NULL;
     }
     if (buff[0] == 'E') {
         fdProc(read_fd, 1);

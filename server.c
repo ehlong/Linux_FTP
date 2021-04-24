@@ -77,7 +77,9 @@ void serveLoop(int l_fd) {
         else {                          //child
             while(1) {
                 instructions = fdReader(c_fd);
-                write(1, instructions, strlen(instructions));
+                if (instructions == NULL) {
+                    exit(1);
+                }
                 flag = serverProcess(instructions, c_fd, 0);
                 if (flag > 0) {     //if dataport needed
                     free(instructions);
@@ -114,6 +116,7 @@ int serverProcess(char *input, int c_fd, int data_fd) {
             //ls -l
             lsl(c_fd, d_fd);
             write(c_fd, "A\n", 2);
+            write(1, "SUCCESS\n", 8);
             close(d_fd);
             break;
         case 'G':
@@ -121,6 +124,7 @@ int serverProcess(char *input, int c_fd, int data_fd) {
             //get pathname
             get(c_fd, d_fd, input);
             write(c_fd, "A\n", 2);
+            write(1, "SUCCESS\n", 8);
             close(d_fd);
             break;
         case 'P':
@@ -128,13 +132,13 @@ int serverProcess(char *input, int c_fd, int data_fd) {
             //put file
             write(c_fd, "A\n", 2);
             put(c_fd, d_fd, input);
+            write(1, "SUCCESS\n", 8);
             close(d_fd);
             break;
         default:
             printf("Invalid input\n");
             break;
     }
-    printf("DFD before exit = %i\n", d_fd);
     return d_fd;
 }
 
@@ -157,6 +161,7 @@ void ls(int c_fd, int d_fd) {
 
 int quit(int c_fd) {
     fdWriter("A\n", c_fd);          //acknowledge
+    write(1, "SUCCESS\n", 8);
     return -1;                              //quit value
 }
 
@@ -170,12 +175,15 @@ void cd(int c_fd, char *input) {
     if (test == -1) {
         errorFormat(c_fd);
     }
-    test = chdir(first);
-    if (test == -1) {
-        errorFormat(c_fd);
-    }
     else {
-        fdWriter("A\n", c_fd);
+        test = chdir(first);
+        if (test == -1) {
+            errorFormat(c_fd);
+        }
+        else {
+            fdWriter("A\n", c_fd);
+            write(1, "SUCCESS\n", 8);
+        }
     }
 }
 
@@ -270,6 +278,9 @@ int dataFD(int c_fd) {
         errorFormat(c_fd);
         exit(1);
     }
+    else {
+        write(1, "SUCCESS\n", 8);
+    }
     return d_fd;
 }
 
@@ -280,6 +291,7 @@ void errorFormat(int c_fd) {                //works
     strncpy(estring, strerror(errno), len - 1);
     fdWriter("E", c_fd);
     fdWriter(estring, c_fd);
+    write(1, "FAIL\n", 5);
 }
 
 int getSock(int l_fd) {                     //works
