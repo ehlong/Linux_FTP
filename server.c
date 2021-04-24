@@ -86,13 +86,15 @@ void serveLoop(int l_fd) {
                 write(1, instructions, strlen(instructions));
                 flag = serverProcess(instructions, c_fd, 0);
                 if (flag > 0) {
+                    printf("Pre-free\n");
                     free(instructions);
+                    printf("First free\n");
                     instructions = fdReader(c_fd);
-                    serverProcess(instructions, c_fd, flag);
+                    flag = serverProcess(instructions, c_fd, flag);
                 }
                 else if (flag < 0) {
                     free(instructions);
-                    break;
+                    exit(1);
                 }
                 free(instructions);
             }
@@ -119,24 +121,28 @@ int serverProcess(char *input, int c_fd, int data_fd) {
             //dfd
             //ls -l
             lsl(c_fd, d_fd);
+            write(c_fd, "A\n", 2);
             close(d_fd);
             break;
         case 'G':
             //dfd
             //get pathname
             get(c_fd, d_fd, input);
+            write(c_fd, "A\n", 2);
             close(d_fd);
             break;
         case 'P':
             //dfd
             //put file
             put(c_fd, d_fd, input);
+            write(c_fd, "A\n", 2);
             close(d_fd);
             break;
         default:
             printf("Invalid input\n");
             break;
     }
+    printf("DFD before exit = %i\n", d_fd);
     return d_fd;
 }
 
@@ -156,7 +162,6 @@ void ls(int d_fd) {
         //acknowledge?
     }
     else {                          //child
-        close(read);
         dup2(d_fd, 1);
         execlp("ls", "ls", "-l", "-a", NULL);
         fprintf(stderr, "Error: %s\n", strerror(errno)); //if error
@@ -172,7 +177,7 @@ int cd(int c_fd, char *input) {
     int test;
     first = malloc(strlen(input) - 1);
     memset(first, '\0', strlen(first));
-    memcpy(first, &input[1], strlen(input) - 2);
+    memcpy(first, &input[1], strlen(input) - 1);
     test = chdir(first);
     if (test == -1) {
         errorFormat(c_fd);
@@ -182,83 +187,87 @@ int cd(int c_fd, char *input) {
     }
 }
 
-int lsl(int c_fd, int d_fd) {
+int lsl(int c_fd, int d_fd) {                   //works
     if (d_fd <= 0) {
         fdWriter("EError: Data connection not established\n", c_fd);
     }
     else {
-        int c_fd, length, hostEntry, pid, flag;
-        struct sockaddr_in clientAddress;
-        length = sizeof(struct sockaddr_in);
-        c_fd = accept(d_fd, (struct sockaddr*) &clientAddress,
-                      &length);
-        if (c_fd < 0) {                 //actually listen on port
-            perror("Error");
-            exit(1);
-        }
         int in = dup(0);
         int out = dup(1);
-        ls(c_fd);
+        ls(d_fd);
         dup2(in, 0);
         dup2(out, 1);
         fdWriter("A\n", c_fd);
     }
 }
 
-int get(int c_fd, int d_fd, char *input) {
-    char *first;
-    int test;
-    first = malloc(strlen(input) - 1);
-    memset(first, '\0', strlen(first));
-    memcpy(first, &input[1], strlen(input) - 2);
-    test = access(first, R_OK | F_OK);
-    if (test == -1) {
-        errorFormat(c_fd);
+int get(int c_fd, int d_fd, char *input) {          //works
+    if (d_fd <= 0) {
+        fdWriter("EError: Data connection not established\n", c_fd);
     }
-    int file = open(first, O_RDONLY);
-    if (file < 0) {
-        errorFormat(c_fd);
+    else {
+        printf("\n\n");
+        write(1, input, strlen(input));
+        printf("\n\n");
+        char *first;
+        int test;
+        first = malloc(strlen(input) - 1);
+        memset(first, '\0', strlen(first));
+        memcpy(first, &input[1], strlen(input) - 1);
+        printf(first);
+        test = access(first, R_OK | F_OK);
+        if (test == -1) {
+            errorFormat(c_fd);
+        }
+        int file = open(first, O_RDONLY);
+        if (file < 0) {
+            errorFormat(c_fd);
+        }
+        free(first);
+        fdProc(file, d_fd);
     }
-    free(first);
-    fdProc(file, d_fd);
 }
 
 int put(int c_fd, int d_fd, char *input) {
-    char *first;
-    int test;
-    first = malloc(strlen(input) - 1);
-    memset(first, '\0', strlen(first));
-    memcpy(first, &input[1], strlen(input) - 2);
-    char *last = strrchr(first, '/');
-    if (last != NULL) {
-        //use last for put
-        test = access(last, F_OK);
-        if (test == -1) {               //file does NOT exist
-            last++;
-            int file = open(last, O_WRONLY | O_CREAT, S_IRWXU);
-            fdProc(d_fd, file);
-            close(file);
-        }
-        else {
-            fdWriter("EError: File already exists\n", c_fd);
-        }
+    if (d_fd <= 0) {
+        fdWriter("EError: Data connection not established\n", c_fd);
     }
     else {
-        //use first for put
-        test = access(first, F_OK);
-        if (test == -1) {               //file does NOT exist
-            first++;
-            int file = open(first, O_WRONLY | O_CREAT, S_IRWXU);
-            fdProc(d_fd, file);
-            close(file);
-        }
-        else {
-            fdWriter("EError: File already exists\n", c_fd);
+        printf("At put\n");
+        char *first;
+        int test;
+        first = malloc(strlen(input) - 1);
+        memset(first, '\0', strlen(first));
+        memcpy(first, &input[1], strlen(input) - 1);
+        printf(first);
+        char *last = strrchr(first, '/');
+        if (last != NULL) {
+            //use last for put
+            test = access(last, F_OK);
+            if (test == -1) {               //file does NOT exist
+                last++;
+                int file = open(last, O_WRONLY | O_CREAT, S_IRWXU);
+                fdProc(d_fd, file);
+                close(file);
+            } else {
+                fdWriter("EError: File already exists\n", c_fd);
+            }
+        } else {
+            //use first for put
+            test = access(first, F_OK);
+            if (test == -1) {               //file does NOT exist
+                first++;
+                int file = open(first, O_WRONLY | O_CREAT, S_IRWXU);
+                fdProc(d_fd, file);
+                close(file);
+            } else {
+                fdWriter("EError: File already exists\n", c_fd);
+            }
         }
     }
 }
 
-int dataFD(int c_fd) {
+int dataFD(int c_fd) {                      //works
     printf("At DFD\n");
     int d_fd, size;
     d_fd = serverSocket(0, 1);  //make data connection
@@ -271,10 +280,19 @@ int dataFD(int c_fd) {
     snprintf(port, size + 3, "A%d\n", sock);  //write fd to port
     fdWriter(port, c_fd);                   //send to client
     free(port);
+    int length;
+    struct sockaddr_in clientAddress;
+    length = sizeof(struct sockaddr_in);
+    d_fd = accept(d_fd, (struct sockaddr*) &clientAddress,
+                  &length);
+    if (d_fd < 0) {                 //actually listen on port
+        perror("Error");
+        exit(1);
+    }
     return d_fd;
 }
 
-void errorFormat(int c_fd) {
+void errorFormat(int c_fd) {                //works
     int len = strlen(strerror(errno));
     char *estring = malloc(len);
     memset(estring, '\n', len);
@@ -283,7 +301,7 @@ void errorFormat(int c_fd) {
     fdWriter(estring, c_fd);
 }
 
-int getSock(int l_fd) {
+int getSock(int l_fd) {                     //works
     struct sockaddr_in random;
     int size = sizeof(random);
     memset(&random, 0, size);

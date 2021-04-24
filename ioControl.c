@@ -36,31 +36,31 @@ char *fdReader(int read_fd) {
                 //r error
             }
             if (buff[0] == '\n') {
-                realloc(readVal, strlen(readVal) + 1);
+                readVal = realloc(readVal, strlen(readVal) + 1);
                 strncat(readVal, "\0", 1);
                 break;
             }
             strncat(readVal, buff, 1);
-            realloc(readVal, strlen(readVal) + 1);
+            readVal = realloc(readVal, strlen(readVal) + 1);
         }
     }
-    else if (buff[0] == 'Q' || buff[0] == 'D' || buff[0] == 'C'
-                || buff[0] == 'L' || buff[0] == 'G' || buff[0] == 'P'){
-        strncpy(readVal, buff, 1);
-        realloc(readVal, strlen(readVal) + 1);
+    else {
+        int i = 0;
+        readVal = realloc(readVal, 4098);
+        readVal[i] = buff[0];
+//        strncpy(readVal, buff, 1);
         write(1, buff, 1);
         while ((check = read(read_fd, buff, 1))) {
+            i++;
             if (check == -1) {
                 break;
             }
             write(1, buff, 1);
             if (buff[0] == '\n') {
-                realloc(readVal, strlen(readVal) + 1);
-                strncat(readVal, "\0", 1);
+                readVal[i] = '\0';
                 break;
             }
-            strncat(readVal, buff, 1);
-            realloc(readVal, strlen(readVal) + 1);
+            readVal[i] = buff[0];
         }
     }
     return readVal;
