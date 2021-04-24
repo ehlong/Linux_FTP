@@ -65,6 +65,10 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
             first = strtok(input, " "); //get first arg
             if (!strcmp(first, "cd")) {     //if cd
                 second = strtok(NULL, " ");
+                if (second == NULL) {
+                    fprintf(stderr, "CD Error\n");//if error
+                    break;
+                }
                 if (access(second, X_OK) == -1) {   //if no execute access
                     fprintf(stderr, "CD Error: %s\n", strerror(errno));//if error
                 }
@@ -98,8 +102,11 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
             first = strtok(input, " ");
             if (!strcmp(first, "get")) {
                 second = strtok(NULL, " ");
+                if (second == NULL) {
+                    fprintf(stderr, "Get Error\n");//if error
+                    break;
+                }
                 char *name = second;
-                printf("Name:%s\n", name);
                 char *filename = strrchr(name, '/');
                 if (filename == NULL) {
                     filename = name;
@@ -107,7 +114,6 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
                 else {
                     filename++;
                 }
-                printf("FN:%s", filename);
                 if (access(filename, F_OK) == -1) {
                     int file = open(filename, O_WRONLY | O_CREAT, S_IRWXU);
                     if (file == -1) {
@@ -117,7 +123,6 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
                         d_fd = toServer("G", second, socketFD, dataFD, address);
                         read(socketFD, buff, 1);
                         if (buff[0] == 'A') {
-                            printf("get worked\n");
                             read(socketFD, buff, 1);
                         }
                         fdProc(d_fd, file);
@@ -139,10 +144,13 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
             first = strtok(input, " ");
             if (!strcmp(first, "show")) {
                 second = strtok(NULL, " ");
+                if (second == NULL) {
+                    fprintf(stderr, "Show Error\n");//if error
+                    break;
+                }
                 d_fd = toServer("G", second, socketFD, dataFD, address);
                 read(socketFD, buff, 1);
                 if (buff[0] == 'A') {
-                    printf("show worked\n");
                     read(socketFD, buff, 1);
                 }
                 more(d_fd);            //write from d_fd to stdout
@@ -156,8 +164,11 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
             first = strtok(input, " ");
             if (!strcmp(first, "put")) {
                 second = strtok(NULL, " ");
+                if (second == NULL) {
+                    fprintf(stderr, "Put Error\n");//if error
+                    break;
+                }
                 char *name = second;
-                printf("Name:%s\n", name);
                 char *filename = strrchr(name, '/');
                 if (filename == NULL) {
                     filename = name;
@@ -165,7 +176,6 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
                 else {
                     filename++;
                 }
-                printf("FN:%s", filename);
                 int file = open(filename, O_RDONLY);
                 if (file == -1) {
                     fprintf(stderr, "Put Error: %s\n", strerror(errno));//if error
@@ -174,7 +184,6 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
                     d_fd = toServer("P", second, socketFD, dataFD, address);
                     read(socketFD, buff, 1);
                     if (buff[0] == 'A') {
-                        printf("put worked\n");
                         read(socketFD, buff, 1);
                     }
                     fdProc(file, d_fd);
@@ -187,7 +196,6 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
                 d_fd = toServer("L", NULL, socketFD, dataFD, address);
                 read(socketFD, buff, 1);
                 if (buff[0] == 'A') {
-                    printf("Going to more\n");
                     read(socketFD, buff, 1);
                     more(d_fd);        //write from d_fd to stdout
                 }
@@ -197,6 +205,10 @@ int clientProcess(const char *input, int socketFD, int dataFD, char* address) {
                 first = strtok(input, " ");
                 if (!strcmp(first, "rcd")) {
                     second = strtok(NULL, " ");
+                    if (second == NULL) {
+                        fprintf(stderr, "rcd Error\n");//if error
+                        break;
+                    }
                     toServer("C", second, socketFD, dataFD, address);
                     read(socketFD, buff, 1);
                     if (buff[0] == 'A') {
