@@ -16,5 +16,6 @@ int get(int c_fd, int d_fd, char *input);
 int put(int c_fd, int d_fd, char *input);
 int dataFD(int c_fd);
 void errorFormat(int c_fd);
+int getSock(int l_fd);
 
 #endif //INC_360FINAL_SERVER_H

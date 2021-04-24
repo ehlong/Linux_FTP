@@ -37,7 +37,7 @@ int serverSocket(int port, int maxCon) {
         < 0) {
         perror("Error");
         exit(1);
-    }                                       //bind server to port
+    }                                         //bind server to port
     if (listen(l_fd, maxCon) < 0) {
         perror("Error");
         exit(1);
@@ -79,14 +79,16 @@ void serveLoop(int l_fd) {
             close(c_fd);
             while(waitpid(0, NULL, WNOHANG) > 0);   //clean up zombies
         }
-        else {                          //child
+        else {                          //child     *****ABOVE WORKS*****
             while(1) {
-                instructions = fdReader(l_fd);
-                flag = serverProcess(instructions, l_fd, 0);
+                instructions = fdReader(c_fd);      //check this
+                printf("Instructions received\n");
+                write(1, instructions, strlen(instructions));
+                flag = serverProcess(instructions, c_fd, 0);
                 if (flag > 0) {
                     free(instructions);
-                    instructions = fdReader(l_fd);
-                    serverProcess(instructions, l_fd, flag);
+                    instructions = fdReader(c_fd);
+                    serverProcess(instructions, c_fd, flag);
                 }
                 else if (flag < 0) {
                     free(instructions);
@@ -99,6 +101,8 @@ void serveLoop(int l_fd) {
 }
 
 int serverProcess(char *input, int c_fd, int data_fd) {
+    printf("At process\n");
+    write(1, input, 1);
     int d_fd = data_fd;
     switch (input[0]) {             //check input
         case 'Q':
@@ -137,6 +141,7 @@ int serverProcess(char *input, int c_fd, int data_fd) {
 }
 
 void ls(int d_fd) {
+    printf("At LS\n");
     int test;
     if (test != 0) {		//if pipe fails
         printf("%s\n", strerror(errno));
@@ -182,9 +187,18 @@ int lsl(int c_fd, int d_fd) {
         fdWriter("EError: Data connection not established\n", c_fd);
     }
     else {
+        int c_fd, length, hostEntry, pid, flag;
+        struct sockaddr_in clientAddress;
+        length = sizeof(struct sockaddr_in);
+        c_fd = accept(d_fd, (struct sockaddr*) &clientAddress,
+                      &length);
+        if (c_fd < 0) {                 //actually listen on port
+            perror("Error");
+            exit(1);
+        }
         int in = dup(0);
         int out = dup(1);
-        ls(d_fd);
+        ls(c_fd);
         dup2(in, 0);
         dup2(out, 1);
         fdWriter("A\n", c_fd);
@@ -245,11 +259,16 @@ int put(int c_fd, int d_fd, char *input) {
 }
 
 int dataFD(int c_fd) {
+    printf("At DFD\n");
     int d_fd, size;
     d_fd = serverSocket(0, 1);  //make data connection
-    size = snprintf( NULL, 0, "%d", d_fd );
-    char *port = malloc(size + 2);
-    snprintf(port, size + 2, "A%d", d_fd);  //write fd to port
+    printf("DFD made\n");
+    int sock = getSock(d_fd);
+    size = snprintf( NULL, 0, "%d", sock );
+    printf("Size: %i DFS: %i\n", size, sock);
+    char *port = malloc(size + 3);
+    memset(port, '\n', size + 3);
+    snprintf(port, size + 3, "A%d\n", sock);  //write fd to port
     fdWriter(port, c_fd);                   //send to client
     free(port);
     return d_fd;
@@ -262,4 +281,13 @@ void errorFormat(int c_fd) {
     strncpy(estring, strerror(errno), len - 1);
     fdWriter("E", c_fd);
     fdWriter(estring, c_fd);
+}
+
+int getSock(int l_fd) {
+    struct sockaddr_in random;
+    int size = sizeof(random);
+    memset(&random, 0, size);
+    getsockname(l_fd, &random, &size);
+    int port = ntohs(random.sin_port);
+    return port;
 }
